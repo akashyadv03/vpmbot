@@ -4,10 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Send, MessageCircle } from "lucide-react";
-
+import toast, { Toaster } from 'react-hot-toast';
 import { cn } from "@/lib/utils";
-
+import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { api } from "convex/_generated/api";
+import { getOrCreateSessionId } from "@/lib/session";
 import {
 
   toUIMessages,
@@ -19,6 +20,7 @@ import {
 import { useAction } from "convex/react";
 
 
+import Markdown from "@/lib/markdown";
 interface ChatBotProps {
   isOpen: boolean;
   onClose: () => void;
@@ -33,12 +35,14 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
 
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
   const sendMessageTOAgent = useAction(api.agent.sendMessageToAgent);
 
 
   async function handleSendMessage() {
     if (!inputValue.trim()) return;
-    // Ensure we have a thread id. Create one only when the user sends the first message.
+    const sessionId = getOrCreateSessionId();
+    // <Markdown text={visibleText} />
     let currentThreadId = threadId;
     if (!currentThreadId) {
       const id = await createThread();
@@ -52,11 +56,20 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
       await sendMessageTOAgent({
         message: inputValue,
         threadId: currentThreadId,
+        sessionId,
       });
-    } finally {
-      setIsLoading(false);
+    } catch (e) {
+      if (isRateLimitError(e)) {
+        toast.error("You have exceeded the message limit");
+        setRateLimited(true);
+        return;
+      }
     }
-    setInputValue("");
+    finally {
+      setIsLoading(false);
+      setInputValue("");
+    }
+
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -68,7 +81,8 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full sm:w-96 max-h-[90vh] sm:max-h-[600px] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+      <Toaster />
+      <div className="bg-white rounded-2xl shadow-2xl w-full sm:w-96 max-h-[90vh] sm:max-h-150 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
         <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MessageCircle className="w-6 h-6" />
@@ -109,17 +123,22 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
 
         <div className="border-t border-slate-200 bg-white p-4 space-y-3">
           <div className="flex gap-2">
-            <Input
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type your question..."
-              className="flex-1 rounded-full border-slate-300 focus:ring-blue-500"
-              disabled={isLoading}
-            />
+            <div className="flex-1">
+              <Input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your question..."
+                className="flex-1 rounded-full border-slate-300 focus:ring-blue-500"
+                disabled={isLoading || rateLimited}
+              />
+              {rateLimited && (
+                <p className="text-sm text-red-500 mt-1">You have exceeded the message limit</p>
+              )}
+            </div>
             <Button
               onClick={handleSendMessage}
-              disabled={isLoading || !inputValue.trim()}
+              disabled={isLoading || rateLimited || !inputValue.trim()}
               className="rounded-full bg-blue-600 hover:bg-blue-700 text-white p-2 h-10 w-10 flex items-center justify-center"
               size="icon"
             >
@@ -139,9 +158,23 @@ function MyComponent({ threadId }: { threadId: string }) {
     { initialNumItems: 10, stream: true }
   );
   const messages = toUIMessages(results ?? []);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Smooth-scroll to bottom when streaming updates arrive or messages change.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Use a short timeout to allow the new content to render before scrolling.
+    const t = window.setTimeout(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }, 50);
+
+    return () => window.clearTimeout(t);
+  }, [results]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+    <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
       {messages.map((message) => (
         <div
           key={message.id}
@@ -169,7 +202,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
           : "bg-white text-slate-800 border border-slate-200 rounded-bl-none"
       )}
     >
-      {visibleText}
+      <Markdown text={visibleText} />
     </div>
   );
 }
