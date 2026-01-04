@@ -11,16 +11,18 @@ import { api } from "convex/_generated/api";
 import { getOrCreateSessionId } from "@/lib/session";
 import {
 
+  optimisticallySendMessage,
   toUIMessages,
   useSmoothText,
   useThreadMessages,
   useUIMessages,
   type UIMessage,
 } from "@convex-dev/agent/react";
-import { useAction } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 
 
 import Markdown from "@/lib/markdown";
+import { string } from "zod/v4";
 interface ChatBotProps {
   isOpen: boolean;
   onClose: () => void;
@@ -31,18 +33,18 @@ interface ChatBotProps {
 export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
   // const createThread = useMutation(api.agent.createThread);
   const createThread = useAction(api.agent.createNewThread);
-  const [threadId, setThreadId] = useState<string>("");
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
 
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
-  const sendMessageTOAgent = useAction(api.agent.sendMessageToAgent);
+  const sendMessageTOAgent = useMutation(api.agent.sendMessageToAgent).withOptimisticUpdate(optimisticallySendMessage(api.agent.listThreadMessages));
 
 
   async function handleSendMessage() {
     if (!inputValue.trim()) return;
     const sessionId = getOrCreateSessionId();
-    // <Markdown text={visibleText} />
+
     let currentThreadId = threadId;
     if (!currentThreadId) {
       const id = await createThread();
@@ -53,10 +55,10 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
     // Start loading state, call the action and wait for server-side streaming to finish.
     setIsLoading(true);
     try {
-      await sendMessageTOAgent({
-        message: inputValue,
+      sendMessageTOAgent({
+        prompt: inputValue,
         threadId: currentThreadId,
-        sessionId,
+        // sessionId,
       });
     } catch (e) {
       if (isRateLimitError(e)) {
@@ -152,52 +154,120 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
 }
 
 function MyComponent({ threadId }: { threadId: string }) {
-  const { results } = useThreadMessages(
+  const messages = useThreadMessages(
     api.agent.listThreadMessages,
     { threadId },
     { initialNumItems: 10, stream: true }
   );
-  const messages = toUIMessages(results ?? []);
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Smooth-scroll to bottom when streaming updates arrive or messages change.
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    console.log(`Messages`, messages.results)
+  }, [messages.results]);
 
-    // Use a short timeout to allow the new content to render before scrolling.
-    const t = window.setTimeout(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    }, 50);
-
-    return () => window.clearTimeout(t);
-  }, [results]);
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-      {messages.map((message) => (
-        <div
-          key={message.id}
-          className={cn(
-            "flex",
-            message.role === "user" ? "justify-end" : "justify-start"
-          )}
-        >
-          <MessageBubble message={message} />
-        </div>
-      ))}
+    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+      {messages.results
+        .filter((m) => {
+          // Filter out tool result messages
+          if (m.parts) return true;
+          // return !m.parts.some((part) => part.type === "tool-result");
+        })
+        .map((m) => (
+          <MessageRow key={m.key} message={m} />
+        ))}
+
     </div>
   );
 }
 
-function MessageBubble({ message }: { message: UIMessage }) {
-  const [visibleText] = useSmoothText(message.text);
+
+
+// function MessageBubble({ message }: { message: string }) {
+//   const messageEndRef = useRef<HTMLDivElement | null>(null);
+
+//   const scrollToBottom = () => {
+//     messageEndRef.current?.scrollIntoView({
+//       behavior: "smooth"
+//     });
+//   }
+//   useEffect(() => {
+//     scrollToBottom();
+//   }, [message]);
+//   // const isUser = message.role === "user";
+
+//   const [visibleText] = useSmoothText(message);
+//   // console.log(visibleText);
+//   return (
+//     <div ref={messageEndRef}
+//       className={cn(
+//         "max-w-xs px-4 py-3 rounded-xl text-sm leading-relaxed",
+//         // isUser
+//         //   ? "bg-blue-600 text-white rounded-br-none"
+//         //   : "bg-white text-slate-800 border border-slate-200 rounded-bl-none"
+//       )}
+//     >
+//       <Markdown text={visibleText} />
+//     </div>
+//   );
+// }
+
+
+function MessageRow({ message }: { message: UIMessage }) {
+  if (!message.role) return null;
+
+  const text = getMessageText(message);
+  if (!text) return null;
+
+  const isUser = message.role === "user";
+
+  return (
+    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+      <MessageBubble
+        text={text}
+        role={message.role}
+        streaming={message.status === "streaming"}
+      />
+    </div>
+  );
+}
+
+
+
+function AssistantMessage({ message }: { message: UIMessage }) {
+  //   const hasToolParts = message.parts?.some((part) => part.type === "tool-call" || part.type === "tool-result");
+  //   if (hasToolParts) return <ToolMessage message={message} />;
+
+  const [visibleText] = useSmoothText(message.text ?? "", {
+    startStreaming: message.status === "streaming",
+  });
+  console.log("visible ", visibleText);
+
+  return (
+    <div>
+      {/* <MessageBubble message={visibleText} /> */}
+    </div>
+  )
+}
+
+function MessageBubble({
+  text,
+  role,
+  streaming,
+}: {
+  text: string;
+  role: "user" | "assistant" | "system";
+  streaming?: boolean;
+}) {
+  const [visibleText] = useSmoothText(text, {
+    startStreaming: streaming,
+  });
 
   return (
     <div
       className={cn(
-        "max-w-xs px-4 py-3 rounded-xl text-sm leading-relaxed",
-        message.role === "user"
+        "max-w-[80%] px-4 py-3 rounded-xl text-sm leading-relaxed",
+        role === "user"
           ? "bg-blue-600 text-white rounded-br-none"
           : "bg-white text-slate-800 border border-slate-200 rounded-bl-none"
       )}
@@ -206,3 +276,69 @@ function MessageBubble({ message }: { message: UIMessage }) {
     </div>
   );
 }
+
+function getMessageText(message: UIMessage): string {
+  if (message.text) return message.text;
+
+  if (!message.parts) return "";
+
+  return message.parts
+    .filter((p) => p.type === "text")
+    .map((p: any) => p.text)
+    .join("");
+}
+
+
+function UserMessage({ message }: { message: UIMessage }) {
+  let userMessage = message.text ?? "";
+  try {
+    userMessage = parseUserMessageJSON(message.text).message;
+
+  } catch (e) {
+  }
+  return (
+    <div>
+      {/* <MessageBubble message={userMessage} /> */}
+    </div>
+  )
+}
+
+type UserMessageJSON = {
+  message: string,
+}
+function parseUserMessageJSON(message: string): UserMessageJSON {
+  return JSON.parse(message) as UserMessageJSON;
+};
+
+// function ToolMessage({ message }: { message: UIMessage }) {
+//   if (message.role != "assistant") return null;
+//   if (!message.parts) return null;
+//   return (
+//     <div>
+//       {message.parts.map((part, idx) => {
+//         if (part.type === "tool-call") {
+//           const toolCallPart = part as unknown as { type: "tool-call"; toolCallId: string; toolName?: string; args?: any };
+//           if (!toolCallPart.toolName) return null;
+//           return (
+//             <div key={idx}>
+//               vpm bot  used <span style={{ fontWeight: 500 }}>{toolCallPart.toolName}</span>
+//             </div>
+//           );
+//         }
+
+//         if (part.type == "tool-result") return null;
+//         return null;
+//       })}
+
+//     </div>
+//   );
+// }
+
+// function UserMessage ({ message }: { message: UIMessage }) {
+//   if (!message.text) return null;
+//   let userMessage = message.text ?? "";
+//   return (
+//     <div>
+//       <MessageBubble message={message}/>
+//     </div>
+//   )}
