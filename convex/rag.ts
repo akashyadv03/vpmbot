@@ -19,41 +19,25 @@ export const add = action({
     handler: async (ctx, { text }) => {
         // Add the text to a namespace shared by all users.
         const response = await rag.add(ctx, {
-            namespace: "all-users",
+            namespace: "about-VPM",
             text,
         });
         console.log(response);
     },
 });
 
-
-
-export const ingestPdf = action({
-    args: {
-        text: v.string(),
-        filename: v.string(),
-        storageId: v.id("_storage"),
-        validTill: v.optional(v.number()),
-        createdAt: v.number(),
-    },
-    handler: async (ctx, args) => {
-        const { entryId } = await rag.add(ctx, {
+export const search = action({
+    args: { query: v.string() },
+    handler: async (ctx, { query }) => {
+        const ragResult = await rag.search(ctx, {
             namespace: "all-users",
-            text: args.text,
-            metadata: { filename: args.filename, storageId: args.storageId }
+            query,
+            limit: 5,
+            vectorScoreThreshold: 0.3,
         });
-
-
-        const docsId = await ctx.runMutation(internal.document.saveDocReference, {
-            entryId,
-            storageId: args.storageId,
-            filename: args.filename,
-            validTill: args.validTill,
-            createdAt: args.createdAt,
-            isActive: true,
-        });
-
-        console.log("Document reference saved docsId is", docsId);
-        return docsId;
+        return ragResult.entries.map((e) => e.text);
     },
-})
+});
+
+
+// This is now handled by document.storeFile - keeping for backward compatibility if needed

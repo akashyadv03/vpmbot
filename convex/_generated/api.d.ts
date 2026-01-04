@@ -11,7 +11,6 @@
 import type * as agent from "../agent.js";
 import type * as document from "../document.js";
 import type * as rag from "../rag.js";
-import type * as rate from "../rate.js";
 
 import type {
   ApiFromModules,
@@ -23,7 +22,6 @@ declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   document: typeof document;
   rag: typeof rag;
-  rate: typeof rate;
 }>;
 
 /**

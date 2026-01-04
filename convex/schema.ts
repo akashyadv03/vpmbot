@@ -15,14 +15,14 @@ export default defineSchema({
         entryId: vEntryId,
         filename: v.string(),
         storageId: v.id("_storage"),
-
+        category: v.optional(v.string()),
         isActive: v.boolean(),
         validTill: v.optional(v.number()),
-
         createdAt: v.number(),
     })
         .index("by_entryId", ["entryId"])
         .index("by_isActive", ["isActive"])
+        .index("by_category", ["category"])
 
 
 })

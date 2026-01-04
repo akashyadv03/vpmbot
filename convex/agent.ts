@@ -28,6 +28,25 @@ const getAboutCollege = createTool({
     },
 });
 
+const getAddmisionInfo = createTool({
+    description: "Get information related to admissions in VPM RZ Shah College such as dates,eligibility,procedures etc.",
+    args: z.object({ query: z.string().describe("Describe the admission information you're looking for") }),
+    handler: async (ctx, { query }) => {
+        const context = await rag.search(ctx, { namespace: "Admission", query });
+        return context.text;
+    },
+});
+
+const getExamInfo = createTool({
+    description: "Get information related to exams in VPM RZ Shah College such as exam schedules,timetables,results etc.",
+    args: z.object({ query: z.string().describe("Describe the exam information you're looking for") }),
+    handler: async (ctx, { query }) => {
+        const context = await rag.search(ctx, { namespace: "Exams", query });
+        return context.text;
+    },
+});
+
+
 export const agent = new Agent(components.agent, {
     name: "College Assistant",
     languageModel: openai.chat("gpt-4o-mini"),
@@ -53,7 +72,7 @@ Responses must be written in clear and simple language, be concise and easy for 
 
 If multiple possible answers are found, list all relevant possibilities briefly and do not focus deeply on just one unless the user asks for clarification.`,
 
-    tools: { searchContext, getAboutCollege },
+    tools: { searchContext, getAboutCollege, getAddmisionInfo, getExamInfo },
     maxSteps: 10,
 });
 

@@ -1,27 +1,55 @@
 import { v } from "convex/values";
-import { action, internalAction, internalMutation, query } from "./_generated/server";
+import { action, internalAction, internalMutation, mutation, query } from "./_generated/server";
 import { guessMimeTypeFromExtension, guessMimeTypeFromContents, vEntryId, } from "@convex-dev/rag"
 import { internal } from "./_generated/api";
-import { act } from "react";
 import { internalQuery } from "./_generated/server";
 import { rag } from "./rag";
-import { EntryId } from "@convex-dev/rag";
 
 
-export const addFile = action({
-    args: {
-        filename: v.string(),
-        bytes: v.bytes(),
-        mimeType: v.string(),
-        category: v.optional(v.string()),
+// Get upload URL for direct file upload
+export const generateUploadUrl = mutation({
+    args: {},
+    handler: async (ctx) => {
+        return await ctx.storage.generateUploadUrl();
     },
-    handler: async (ctx, args) => {
-        const { filename, bytes, category } = args;
+});
 
-        const mimeType = args.mimeType || guessMimeType(filename, bytes);
+// Store file after upload and process it
+export const storeFile = action({
+    args: {
+        storageId: v.id("_storage"),
+        filename: v.string(),
+        category: v.union(v.literal("Exam"), v.literal("Admission")),
+        text: v.string(),
+        validTill: v.optional(v.number()),
+    },
+    handler: async (ctx, args): Promise<{ docsId: string; entryId: string }> => {
+        const createdAt = Date.now();
+        console.log("calling rag.add");
+        // Ingest text into RAG
+        const { entryId } = await rag.add(ctx, {
+            namespace: args.category,
+            text: args.text,
+            metadata: {
+                filename: args.filename,
+                storageId: args.storageId,
+                ...(args.category && { category: args.category })
+            }
+        });
+        console.log("rag.add completed with entryId =", entryId);
 
-        const blob = new Blob([bytes], { type: mimeType });
-        const storageId = await ctx.storage.store(blob);
+        // Save document reference
+        const docsId = await ctx.runMutation(internal.document.saveDocReference, {
+            entryId,
+            storageId: args.storageId,
+            filename: args.filename,
+            category: args.category,
+            validTill: args.validTill,
+            createdAt,
+            isActive: true,
+        });
+
+        return { docsId, entryId };
     },
 });
 
@@ -31,6 +59,7 @@ export const saveDocReference = internalMutation({
         entryId: vEntryId,
         storageId: v.id("_storage"),
         filename: v.string(),
+        category: v.optional(v.string()),
         isActive: v.boolean(),
         validTill: v.optional(v.number()),
         createdAt: v.number(),
@@ -43,6 +72,7 @@ export const saveDocReference = internalMutation({
             isActive: args.isActive,
             createdAt: args.createdAt,
             filename: args.filename,
+            category: args.category,
         });
 
         console.log("document inserted in document table where docsId =", docsId);
@@ -55,8 +85,10 @@ export const removeDocReference = internalMutation({
         docsId: v.id("documents"),
     },
     handler: async (ctx, { docsId }) => {
-        await ctx.db.delete(docsId);
+        const response = await ctx.db.delete(docsId);
+        return response;
     },
+
 });
 
 
@@ -73,12 +105,56 @@ export const getDocById = internalQuery({
     },
 })
 
+// export const listDocuments = query({
+//     args: {},
+//     handler: async (ctx) => {
+//         const docs = await ctx.db
+//             .query("documents")
+//             .withIndex("by_isActive", (q) => q.eq("isActive", true))
+//             .order("desc")
+//             .collect();
+
+//         // Get download URLs for each document
+//         return docs.map(async (doc) => {
+//             const downloadUrl = await ctx.storage.getUrl(doc.storageId)
+//             return { ...doc, downloadUrl }
+//             });
+//     },
+// });
+
+// Get download URL for a specific document
+
 export const listDocuments = query({
     args: {},
     handler: async (ctx) => {
-        return await ctx.db
+        const docs = await ctx.db
             .query("documents")
+            .withIndex("by_isActive", (q) => q.eq("isActive", true))
+            .order("desc")
             .collect();
+
+        const docsWithUrls = await Promise.all(
+            docs.map(async (doc) => {
+                const downloadUrl = await ctx.storage.getUrl(doc.storageId);
+                return {
+                    ...doc,
+                    downloadUrl,
+                };
+            })
+        );
+
+        return docsWithUrls;
+    },
+});
+
+
+
+export const getDownloadUrl = query({
+    args: {
+        storageId: v.id("_storage"),
+    },
+    handler: async (ctx, { storageId }) => {
+        return await ctx.storage.getUrl(storageId);
     },
 });
 
@@ -89,13 +165,14 @@ export const deleteOldPdf = action({
     handler: async (ctx, { docsId }) => {
         const doc = await ctx.runQuery(internal.document.getDocById,
             { docsId });
+        console.log("document to be deleted is ", doc);
         const delRag = await rag.delete(ctx, { entryId: doc.entryId })
         const delStorage = await ctx.storage.delete(doc.storageId);
         const rmDbRef = await ctx.runMutation(internal.document.removeDocReference, {
             docsId
         });
 
-        console.log("response of delete rag is,", delRag)
+        console.log("response of delete rag is,", delRag);
         console.log("response of delete delete storage is,", delStorage)
         console.log("response of delete rmDbRef is,", rmDbRef)
 
@@ -106,8 +183,8 @@ export const deleteOldPdf = action({
 
 
 
-function guessMimeType(filename: string, bytes: ArrayBuffer) {
-    return (
-        guessMimeTypeFromExtension(filename) || guessMimeTypeFromContents(bytes)
-    );
-}
+// function guessMimeType(filename: string, bytes: ArrayBuffer) {
+//     return (
+//         guessMimeTypeFromExtension(filename) || guessMimeTypeFromContents(bytes)
+//     );
+// }
