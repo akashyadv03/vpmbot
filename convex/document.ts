@@ -17,6 +17,8 @@ export const generateUploadUrl = mutation({
 // Store file after upload and process it
 export const storeFile = action({
     args: {
+        adminSecret: v.string(),
+
         storageId: v.id("_storage"),
         filename: v.string(),
         category: v.union(v.literal("Exam"), v.literal("Admission")),
@@ -24,6 +26,9 @@ export const storeFile = action({
         validTill: v.optional(v.number()),
     },
     handler: async (ctx, args): Promise<{ docsId: string; entryId: string }> => {
+        if (args.adminSecret !== process.env.ADMIN_SECRET) {
+            throw new Error("Unauthorized");
+        }
         const createdAt = Date.now();
         console.log("calling rag.add");
         // Ingest text into RAG

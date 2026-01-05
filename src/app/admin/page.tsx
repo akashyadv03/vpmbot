@@ -1,3 +1,6 @@
+
+
+
 "use client"
 import { Trash2Icon, UploadIcon, LinkIcon, FileTextIcon } from 'lucide-react';
 import { useAction, useMutation, useQueries, useQuery } from "convex/react"
@@ -8,6 +11,9 @@ import { extractTextFromPdf } from "@/lib/pdfUtils";
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input2';
 import { Card } from '@/components/ui/card';
+const ADMIN_SECRET = process.env.NEXT_PUBLIC_ADMIN_SECRET!;
+
+
 
 export default function AdminPanel() {
     const generateUploadUrl = useMutation(api.document.generateUploadUrl);
@@ -21,10 +27,16 @@ export default function AdminPanel() {
     const [category, setCategory] = useState<"Exam" | "Admission">("Admission");
     const deleteDocuemt = useAction(api.document.deleteOldPdf);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [mounted, setMounted] = useState(false);
 
 
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
-
+    if (!mounted) {
+        return null; // or loading skeleton
+    }
     function handleFileChange(file: File | null) {
         setSelectedFile(file);
     }
@@ -72,6 +84,7 @@ export default function AdminPanel() {
                 expiresAt ? new Date(expiresAt).getTime() : undefined;
             console.log("calling store file");
             const { docsId, entryId } = await storeFile({
+                adminSecret: ADMIN_SECRET,
                 storageId,
                 filename: file.name,
                 text: extractionResult.text,
@@ -87,6 +100,7 @@ export default function AdminPanel() {
         } finally {
             setIsLoading(false);
             setSelectedFile(null);
+            setExpiresAt("");
         }
     }
 
