@@ -1,7 +1,7 @@
-
+"use client"
 export const dynamic = "force-dynamic";
 
-"use client"
+
 import { Trash2Icon, UploadIcon, LinkIcon, FileTextIcon } from 'lucide-react';
 import { useAction, useMutation, useQueries, useQuery } from "convex/react"
 import { api } from "convex/_generated/api";
