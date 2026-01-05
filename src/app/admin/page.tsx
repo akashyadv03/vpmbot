@@ -1,5 +1,5 @@
 
-
+export const dynamic = "force-dynamic";
 
 "use client"
 import { Trash2Icon, UploadIcon, LinkIcon, FileTextIcon } from 'lucide-react';
