@@ -10,28 +10,34 @@ export function proxy(req: NextRequest) {
 
     const cookieSecret = req.cookies.get("admin-secret")?.value;
     const urlSecret = searchParams.get("key");
-    const ADMIN_SECRET = process.env.ADMIN_SECRET;
-    console.log("Admin secret from cookie:", cookieSecret);
-    if (cookieSecret === ADMIN_SECRET) {
+
+    // ✅ Already authenticated via cookie
+    if (cookieSecret === process.env.ADMIN_SECRET) {
         return NextResponse.next();
     }
 
-    // Magic URL login
-    if (urlSecret === ADMIN_SECRET) {
+    // ✅ First-time access using magic URL
+    if (urlSecret === process.env.ADMIN_SECRET) {
         const res = NextResponse.redirect(new URL("/admin", req.url));
 
-        res.cookies.set("admin-secret", ADMIN_SECRET!, {
+        res.cookies.set("admin-secret", process.env.ADMIN_SECRET!, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: true,
             sameSite: "lax",
             path: "/",
-            maxAge: 60 * 60 * 24, // 30 days
+            maxAge: 60 * 60 * 24 * 30, // 30 days
         });
 
         return res;
     }
 
-    // Unauthorized
+    // ❌ Unauthorized access
     return NextResponse.redirect(new URL("/", req.url));
-
 }
+
+/**
+ * Apply middleware only to /admin routes
+ */
+export const config = {
+    matcher: ["/admin/:path*"],
+};
