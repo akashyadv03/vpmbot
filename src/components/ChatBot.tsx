@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +56,7 @@ export default function ChatBot() {
     // Start loading state, call the action and wait for server-side streaming to finish.
     setIsLoading(true);
     try {
-      sendMessageTOAgent({
+      await sendMessageTOAgent({
         prompt: inputValue,
         threadId: currentThreadId,
         // sessionId,
@@ -110,9 +109,9 @@ export default function ChatBot() {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-4 z-50">
+    <div className="fixed inset-0  flex items-end sm:items-center justify-center p-4 z-50 ">
       <Toaster />
-      <div className="bg-white rounded-2xl shadow-2xl w-full sm:w-96 max-h-[90vh] sm:max-h-150 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+      <div className="bg-white h-100 rounded-2xl shadow-2xl w-full sm:w-96 max-h-[90vh] sm:max-h-150 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
         <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <MessageCircle className="w-6 h-6" />
@@ -129,28 +128,28 @@ export default function ChatBot() {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50"></div>
-        {/* 
+        <div className="flex-1 min-h-0  overflow-y-auto p-4 space-y-4 bg-slate-50">
+          {/* 
     <MyComponent threadId={threadId}/> */}
-        {threadId && <MyComponent threadId={threadId} />}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-white text-slate-800 border border-slate-200 px-4 py-3 rounded-xl rounded-bl-none">
-              <div className="flex gap-2">
-                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
-                <div
-                  className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                />
-                <div
-                  className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.4s" }}
-                />
+          {threadId && <MyComponent threadId={threadId} />}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-white text-slate-800 border border-slate-200 px-4 py-3 rounded-xl rounded-bl-none">
+                <div className="flex gap-2">
+                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
+                  <div
+                    className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "0.2s" }}
+                  />
+                  <div
+                    className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "0.4s" }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
+          )}
+        </div>
         <div className="border-t border-slate-200 bg-white p-4 space-y-3">
           <div className="flex gap-2">
             <div className="flex-1">
@@ -176,6 +175,7 @@ export default function ChatBot() {
             </Button>
           </div>
         </div>
+
       </div>
     </div>
   );
@@ -194,7 +194,7 @@ function MyComponent({ threadId }: { threadId: string }) {
 
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+    <div className="space-y-4">
       {messages.results
         .filter((m) => {
           // Filter out tool result messages
@@ -211,34 +211,7 @@ function MyComponent({ threadId }: { threadId: string }) {
 
 
 
-// function MessageBubble({ message }: { message: string }) {
-//   const messageEndRef = useRef<HTMLDivElement | null>(null);
 
-//   const scrollToBottom = () => {
-//     messageEndRef.current?.scrollIntoView({
-//       behavior: "smooth"
-//     });
-//   }
-//   useEffect(() => {
-//     scrollToBottom();
-//   }, [message]);
-//   // const isUser = message.role === "user";
-
-//   const [visibleText] = useSmoothText(message);
-//   // console.log(visibleText);
-//   return (
-//     <div ref={messageEndRef}
-//       className={cn(
-//         "max-w-xs px-4 py-3 rounded-xl text-sm leading-relaxed",
-//         // isUser
-//         //   ? "bg-blue-600 text-white rounded-br-none"
-//         //   : "bg-white text-slate-800 border border-slate-200 rounded-bl-none"
-//       )}
-//     >
-//       <Markdown text={visibleText} />
-//     </div>
-//   );
-// }
 
 
 function MessageRow({ message }: { message: UIMessage }) {
@@ -338,35 +311,3 @@ function parseUserMessageJSON(message: string): UserMessageJSON {
   return JSON.parse(message) as UserMessageJSON;
 };
 
-// function ToolMessage({ message }: { message: UIMessage }) {
-//   if (message.role != "assistant") return null;
-//   if (!message.parts) return null;
-//   return (
-//     <div>
-//       {message.parts.map((part, idx) => {
-//         if (part.type === "tool-call") {
-//           const toolCallPart = part as unknown as { type: "tool-call"; toolCallId: string; toolName?: string; args?: any };
-//           if (!toolCallPart.toolName) return null;
-//           return (
-//             <div key={idx}>
-//               vpm bot  used <span style={{ fontWeight: 500 }}>{toolCallPart.toolName}</span>
-//             </div>
-//           );
-//         }
-
-//         if (part.type == "tool-result") return null;
-//         return null;
-//       })}
-
-//     </div>
-//   );
-// }
-
-// function UserMessage ({ message }: { message: UIMessage }) {
-//   if (!message.text) return null;
-//   let userMessage = message.text ?? "";
-//   return (
-//     <div>
-//       <MessageBubble message={message}/>
-//     </div>
-//   )}
