@@ -321,7 +321,7 @@ export default function AdminPanel() {
                                             >
                                                 {doc.isActive ? 'Active' : 'Inactive'}
                                             </span>
-                                            <Button className='bg-red-500' onClick={async () => await deleteDocuemt({ docsId: doc._id })} >Delete from everywhere.</Button>
+                                            <Button className='bg-red-500' onClick={async () => await deleteDocuemt({ docsId: doc._id, adminSecret: ADMIN_SECRET })} >Delete from everywhere.</Button>
 
                                         </div>
                                     </div>
