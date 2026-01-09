@@ -1,21 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function proxy(req: NextRequest) {
-    const { pathname } = req.nextUrl;
+    const { pathname, searchParams } = req.nextUrl;
 
     // Protect only /admin routes
     if (!pathname.startsWith("/admin")) {
         return NextResponse.next();
     }
 
-    const secret = req.cookies.get("admin-secret")?.value;
-    console.log("Admin secret from cookie:", secret);
-
-    // Redirect when the cookie is missing or doesn't match the server secret
-    if (!secret || secret !== process.env.ADMIN_SECRET) {
-        console.log("Unauthorized access attempt");
-        return NextResponse.redirect(new URL("/", req.url));
+    const cookieSecret = req.cookies.get("admin-secret")?.value;
+    const urlSecret = searchParams.get("key");
+    const ADMIN_SECRET = process.env.ADMIN_SECRET;
+    console.log("Admin secret from cookie:", cookieSecret);
+    if (cookieSecret === ADMIN_SECRET) {
+        return NextResponse.next();
     }
 
-    return NextResponse.next();
+    // Magic URL login
+    if (urlSecret === ADMIN_SECRET) {
+        const res = NextResponse.redirect(new URL("/admin", req.url));
+
+        res.cookies.set("admin-secret", ADMIN_SECRET!, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/",
+            maxAge: 60 * 60 * 24, // 30 days
+        });
+
+        return res;
+    }
+
+    // Unauthorized
+    return NextResponse.redirect(new URL("/", req.url));
+
 }
