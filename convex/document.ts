@@ -166,8 +166,12 @@ export const getDownloadUrl = query({
 export const deleteOldPdf = action({
     args: {
         docsId: v.id("documents"),
+        adminSecret: v.string(),
     },
-    handler: async (ctx, { docsId }) => {
+    handler: async (ctx, { docsId, adminSecret }) => {
+        if (adminSecret !== process.env.ADMIN_SECRET) {
+            throw new Error("Unauthorized");
+        }
         const doc = await ctx.runQuery(internal.document.getDocById,
             { docsId });
         console.log("document to be deleted is ", doc);
