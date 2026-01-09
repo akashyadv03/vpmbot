@@ -40,6 +40,8 @@ export default function ChatBot() {
   const [rateLimited, setRateLimited] = useState(false);
   const sendMessageTOAgent = useMutation(api.agent.sendMessageToAgent).withOptimisticUpdate(optimisticallySendMessage(api.agent.listThreadMessages));
   const [open, setOpen] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
 
 
 
@@ -113,10 +115,14 @@ export default function ChatBot() {
       block: "end",
     });
   };
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
+  if (!mounted) return null;
   if (!open) return null;
   return (
-    <div className="fixed inset-0  flex items-end sm:items-center justify-center p-4 z-50 ">
+    <div className="fixed inset-0  flex items-end sm:items-center justify-center p-4 z-50 " suppressHydrationWarning>
       <Toaster />
       <div className="bg-white h-100 rounded-2xl shadow-2xl w-full sm:w-96 max-h-[90vh] sm:max-h-150 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
         <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex items-center justify-between">
