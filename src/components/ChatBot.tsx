@@ -33,6 +33,7 @@ export default function ChatBot() {
   // const createThread = useMutation(api.agent.createThread);
   const createThread = useAction(api.agent.createNewThread);
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -106,6 +107,12 @@ export default function ChatBot() {
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, []);
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  };
 
   if (!open) return null;
   return (
@@ -131,7 +138,7 @@ export default function ChatBot() {
         <div className="flex-1 min-h-0  overflow-y-auto p-4 space-y-4 bg-slate-50">
           {/* 
     <MyComponent threadId={threadId}/> */}
-          {threadId && <MyComponent threadId={threadId} />}
+          {threadId && <MyComponent threadId={threadId} onMessagesChange={scrollToBottom} />}
           {isLoading && (
             <div className="flex justify-start">
               <div className="bg-white text-slate-800 border border-slate-200 px-4 py-3 rounded-xl rounded-bl-none">
@@ -149,6 +156,7 @@ export default function ChatBot() {
               </div>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
         <div className="border-t border-slate-200 bg-white p-4 space-y-3">
           <div className="flex gap-2">
@@ -181,7 +189,7 @@ export default function ChatBot() {
   );
 }
 
-function MyComponent({ threadId }: { threadId: string }) {
+function MyComponent({ threadId, onMessagesChange }: { threadId: string, onMessagesChange: () => void; }) {
   const messages = useThreadMessages(
     api.agent.listThreadMessages,
     { threadId },
@@ -192,6 +200,9 @@ function MyComponent({ threadId }: { threadId: string }) {
     console.log(`Messages`, messages.results)
   }, [messages.results]);
 
+  useEffect(() => {
+    onMessagesChange();
+  }, [messages.results, onMessagesChange]);
 
   return (
     <div className="space-y-4">
