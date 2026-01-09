@@ -5,7 +5,7 @@ export function proxy(req: NextRequest) {
         return NextResponse.next();
     }
 
-    const secret = req.cookies.get("admin-secret")?.value; g
+    const secret = req.cookies.get("admin-secret")?.value;
 
     if (secret !== process.env.ADMIN_SECRET) {
         return NextResponse.redirect(new URL("/", req.url));
