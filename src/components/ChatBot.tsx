@@ -30,7 +30,7 @@ interface ChatBotProps {
 
 
 
-export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
+export default function ChatBot() {
   // const createThread = useMutation(api.agent.createThread);
   const createThread = useAction(api.agent.createNewThread);
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
@@ -39,7 +39,7 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
   const sendMessageTOAgent = useMutation(api.agent.sendMessageToAgent).withOptimisticUpdate(optimisticallySendMessage(api.agent.listThreadMessages));
-
+  const [open, setOpen] = useState(true);
 
   async function handleSendMessage() {
     if (!inputValue.trim()) return;
@@ -80,7 +80,11 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
       handleSendMessage();
     }
   };
-  if (!isOpen) return null;
+
+  function onClose() {
+    setOpen(false);
+  }
+  if (!open) return null;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-4 z-50">
       <Toaster />
