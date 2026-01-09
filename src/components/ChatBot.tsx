@@ -41,6 +41,8 @@ export default function ChatBot() {
   const sendMessageTOAgent = useMutation(api.agent.sendMessageToAgent).withOptimisticUpdate(optimisticallySendMessage(api.agent.listThreadMessages));
   const [open, setOpen] = useState(true);
 
+
+
   async function handleSendMessage() {
     if (!inputValue.trim()) return;
     const sessionId = getOrCreateSessionId();
@@ -83,7 +85,29 @@ export default function ChatBot() {
 
   function onClose() {
     setOpen(false);
+
+    window.parent.postMessage(
+      { type: "CHAT_CLOSE" },
+      "*"
+    );
+
+    console.log("CHAT_CLOSE message sent");
   }
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      // parent origin (ASP.NET)
+      if (event.origin !== "https://localhost:44356") return;
+
+      if (event.data?.type === "CHAT_OPEN") {
+        setOpen(true);
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-4 z-50">
