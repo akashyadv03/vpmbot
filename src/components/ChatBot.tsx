@@ -47,7 +47,7 @@ export default function ChatBot() {
 
   async function handleSendMessage() {
     if (!inputValue.trim()) return;
-    const sessionId = getOrCreateSessionId();
+    // const sessionId = getOrCreateSessionId();
 
     let currentThreadId = threadId;
     if (!currentThreadId) {
